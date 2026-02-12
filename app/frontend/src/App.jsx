@@ -155,6 +155,8 @@ function App() {
   const [showIntro, setShowIntro] = useState(false);
   const [gameFinished, setGameFinished] = useState(false);
   const [gameLost, setGameLost] = useState(false);
+  const [expectedFlag, setExpectedFlag] = useState(null);
+  const [levelSuccessTimes, setLevelSuccessTimes] = useState([]); // [{ level: number, at: secondsElapsed }]
 
   // --- LOGIQUE DU TIMER ---
   useEffect(() => {
@@ -182,6 +184,8 @@ function App() {
     setCode(LEVEL_TEMPLATES[1]);
     setOutput('');
     setInputFlag('');
+    setExpectedFlag(null);
+    setLevelSuccessTimes([]);
   };
 
   const goToIntro = () => {
@@ -191,6 +195,8 @@ function App() {
     setGameLost(false);
     setOutput('');
     setInputFlag('');
+    setExpectedFlag(null);
+    setLevelSuccessTimes([]);
   };
 
   const returnToHome = () => {
@@ -205,6 +211,8 @@ function App() {
     setGameLost(false);
     setOutput('');
     setInputFlag('');
+    setExpectedFlag(null);
+    setLevelSuccessTimes([]);
   };
 
   // --- ACTIONS ---
@@ -219,6 +227,7 @@ function App() {
       setOutput(response.data.output);
 
       if (response.data.success) {
+        setExpectedFlag(response.data.flag);
         setOutput(prev => prev + `\n\n✅ SUCCÈS ! FLAG GÉNÉRÉ : ${response.data.flag}`);
       }
     } catch (err) {
@@ -227,14 +236,28 @@ function App() {
   };
 
   const checkFlag = () => {
-    const levelString = level.toString().padStart(2, '0');
-    // Vérifie si le flag entré correspond au format du niveau actuel
-    if (inputFlag.includes(`LVL${levelString}_`)) {
+    const entered = (inputFlag || '').trim();
+    if (!expectedFlag) {
+      alert('Aucun flag attendu : exécute le patch pour générer le flag.');
+      return;
+    }
+
+    // Vérifie si le flag entré correspond au dernier flag généré pour ce niveau
+    if (entered === expectedFlag) {
+      const successAt = Math.max(0, 600 - timeLeft);
+      setLevelSuccessTimes((prev) => {
+        const next = prev.filter((t) => t.level !== level);
+        next.push({ level, at: successAt });
+        next.sort((a, b) => a.level - b.level);
+        return next;
+      });
+
       if (level < 10) {
         const nextLevel = level + 1;
         const nextLevelString = nextLevel.toString().padStart(2, '0');
         setLevel(nextLevel);
         setInputFlag('');
+        setExpectedFlag(null);
         setOutput(`ACCÈS NIVEAU ${nextLevelString} AUTORISÉ...`);
         setCode(LEVEL_TEMPLATES[nextLevel]);
       } else {
@@ -251,8 +274,22 @@ function App() {
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  // Calcul du score exponentiel
-  const finalScore = (Math.pow(level, 2) * 100) + timeLeft;
+  const totalElapsed = Math.max(0, 600 - timeLeft);
+  const previousLevelSolvedAt = levelSuccessTimes.find((t) => t.level === level - 1)?.at ?? 0;
+  const currentLevelElapsed = Math.max(0, totalElapsed - previousLevelSolvedAt);
+
+  const sortedSuccessTimes = [...levelSuccessTimes].sort((a, b) => a.level - b.level);
+  const perLevelSummary = sortedSuccessTimes.map((t, idx) => {
+    const prevAt = idx === 0 ? 0 : sortedSuccessTimes[idx - 1].at;
+    return {
+      level: t.level,
+      at: t.at,
+      duration: Math.max(0, t.at - prevAt),
+    };
+  });
+
+  const finalTotalTime = gameLost ? 600 : (sortedSuccessTimes.find((t) => t.level === 10)?.at ?? totalElapsed);
+  const finalScoreOutOf10 = gameFinished ? 10 : Math.min(10, sortedSuccessTimes.length);
 
   const levelString = level.toString().padStart(2, '0');
 
@@ -276,19 +313,27 @@ function App() {
         <div style={{ textAlign: 'center', paddingTop: '100px', border: '2px dashed #00ff00', margin: '50px', paddingBottom: '50px' }}>
           <h1 style={{ fontSize: '4rem', color: '#00ff00', textShadow: '0 0 10px #00ff00' }}>MISSION RÉUSSIE</h1>
           <p style={{ fontSize: '2rem' }}>ACCÈS TOTAL OBTENU</p>
-          <p style={{ fontSize: '1.5rem', color: '#fff' }}>GRADE : <span style={{ fontWeight: 'bold' }}>ROOT_ADMIN</span></p>
-          
-          <div style={{ border: '2px solid #00ff00', display: 'inline-block', padding: '30px', marginTop: '20px', backgroundColor: '#000' }}>
-            <p style={{ fontSize: '2rem', margin: 0 }}>SCORE FINAL : {finalScore} PTS</p>
-            <p style={{ fontSize: '1.2rem', marginTop: '10px' }}>TEMPS RESTANT : {formatTime(timeLeft)}</p>
+
+          <div style={{ border: '2px solid #00ff00', display: 'inline-block', padding: '26px 30px', marginTop: '20px', backgroundColor: '#000', textAlign: 'left', minWidth: '520px' }}>
+            <div style={{ fontSize: '1.7rem', margin: 0, color: '#00ff00', fontWeight: 'bold' }}>SCORE : {finalScoreOutOf10}/10</div>
+            <div style={{ fontSize: '1.2rem', marginTop: '10px', color: '#fff' }}>TEMPS TOTAL : {formatTime(finalTotalTime)}</div>
+            <div style={{ marginTop: '18px', color: '#fff', opacity: 0.95 }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>TEMPS PAR NIVEAU</div>
+              {perLevelSummary.length === 0 ? (
+                <div style={{ opacity: 0.9 }}>Aucun niveau enregistré.</div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 20px' }}>
+                  {perLevelSummary.map((row) => (
+                    <React.Fragment key={row.level}>
+                      <div>NIVEAU {row.level.toString().padStart(2, '0')} : {formatTime(row.duration)}</div>
+                      <div style={{ opacity: 0.9 }}>VALIDÉ À : {formatTime(row.at)}</div>
+                    </React.Fragment>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <br />
-          <button 
-            onClick={() => window.location.reload()} 
-            style={{ marginTop: '40px', padding: '15px 40px', backgroundColor: '#00ff00', color: '#000', fontWeight: 'bold', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
-          >
-            REBOOT SYSTEM
-          </button>
           <button
             onClick={returnToHome}
             style={{ marginTop: '15px', padding: '12px 40px', backgroundColor: '#000', color: '#00ff00', fontWeight: 'bold', border: '1px solid #00ff00', cursor: 'pointer', fontSize: '1.1rem' }}
@@ -301,7 +346,27 @@ function App() {
         <div style={{ textAlign: 'center', paddingTop: '120px', border: '2px dashed #ff0000', margin: '50px', paddingBottom: '80px' }}>
           <h1 style={{ fontSize: '3.2rem', color: '#ff0000', textShadow: '0 0 10px #ff0000' }}>MISSION ÉCHOUÉE</h1>
           <p style={{ fontSize: '1.5rem', color: '#fff', marginTop: '25px' }}>T-00:00 — Autodestruction déclenchée.</p>
-          <p style={{ fontSize: '1.1rem', color: '#fff', opacity: 0.9 }}>Le système a explosé. Reviens à l'accueil pour relancer une tentative.</p>
+          <div style={{ border: '2px solid #ff0000', display: 'inline-block', padding: '22px 26px', marginTop: '18px', backgroundColor: '#000', textAlign: 'left', minWidth: '520px' }}>
+            <div style={{ fontSize: '1.5rem', margin: 0, color: '#ff0000', fontWeight: 'bold' }}>SCORE : {finalScoreOutOf10}/10</div>
+            <div style={{ fontSize: '1.2rem', marginTop: '10px', color: '#fff' }}>TEMPS FINAL : {formatTime(finalTotalTime)}</div>
+            <div style={{ marginTop: '16px', color: '#fff', opacity: 0.95 }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>NIVEAUX VALIDÉS</div>
+              {perLevelSummary.length === 0 ? (
+                <div style={{ opacity: 0.9 }}>Aucun niveau validé.</div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 20px' }}>
+                  {perLevelSummary.map((row) => (
+                    <React.Fragment key={row.level}>
+                      <div>NIVEAU {row.level.toString().padStart(2, '0')} : {formatTime(row.duration)}</div>
+                      <div style={{ opacity: 0.9 }}>VALIDÉ À : {formatTime(row.at)}</div>
+                    </React.Fragment>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <p style={{ fontSize: '1.1rem', color: '#fff', opacity: 0.9, marginTop: '18px' }}>Le système a explosé. Reviens à l'accueil pour relancer une tentative.</p>
           <button
             onClick={returnToHome}
             style={{ marginTop: '50px', padding: '18px 55px', backgroundColor: '#ff0000', color: '#000', fontWeight: 'bold', border: 'none', cursor: 'pointer', fontSize: '1.3rem' }}
@@ -365,6 +430,9 @@ function App() {
               >
                 RETOUR
               </button>
+              <span style={{ color: '#fff', opacity: 0.9, fontWeight: 'bold' }}>
+                TEMPS NIVEAU: {formatTime(currentLevelElapsed)}
+              </span>
               <span style={{ color: timeLeft < 60 ? '#ff0000' : '#00ff00', fontWeight: 'bold', fontSize: '1.2rem' }}>
                   TEMPS RESTANT: {formatTime(timeLeft)}
               </span>
@@ -417,7 +485,7 @@ function App() {
                   type="text" 
                   value={inputFlag}
                   onChange={(e) => setInputFlag(e.target.value)}
-                  placeholder="FLAG_LVL..."
+                  placeholder="GG_PADAWAN"
                   style={{ backgroundColor: '#111', color: '#00ff00', border: '1px solid #00ff00', padding: '10px', width: '250px', outline: 'none' }}
                 />
                 <button 

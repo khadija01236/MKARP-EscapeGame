@@ -7,17 +7,17 @@ const path = require('path');
 
 const app = express();
 
-const FLAG_CODENAMES = {
-    '01': 'GG_PADAWAN',
-    '02': 'DELOREAN',
-    '03': 'CRITICAL',
-    '04': 'RPG_LOOT',
-    '05': 'ARC_REACTOR',
-    '06': 'H2G2_42',
-    '07': 'KONAMI',
-    '08': 'SABRE',
-    '09': 'HIGH_SCORE',
-    '10': 'ONE_RING',
+const FLAG_OPTIONS = {
+    '01': ['GG_PADAWAN', 'GG_NOOBMASTER', 'GG_NEO', 'GG_MARIO'],
+    '02': ['BUILD_GREEN', 'GIT_MERGED', 'CI_OK', 'SHIP_IT'],
+    '03': ['CRITICAL_TEMP', 'ITS_OVER_9000', 'RED_ALERT', 'MELTDOWN_AVERTED'],
+    '04': ['INVENTORY_FULL', 'LOOT_SECURED', 'BAG_OF_HOLDING', 'ITEM_GET'],
+    '05': ['ARC_REACTOR', 'POWER_UP', 'ENERGY_FULL', 'CHARGE_COMPLETE'],
+    '06': ['FORTY_TWO', 'DONT_PANIC', 'ANSWER_42', 'H2G2_OK'],
+    '07': ['KONAMI_CODE', 'UPUPDOWNDOWN', 'SECRET_UNLOCKED', 'EXTRA_LIFE'],
+    '08': ['USE_THE_FORCE', 'SABER_READY', 'JEDI_MODE', 'SITH_MODE'],
+    '09': ['NEW_HIGH_SCORE', 'TOP_1', 'GG_WP', 'LEGENDARY_RUN'],
+    '10': ['YOU_SHALL_PASS', 'ONE_RING', 'ROOT_ACCESS', 'FINAL_BOSS_DOWN'],
 };
 
 // Middleware
@@ -65,11 +65,11 @@ app.post('/run', (req, res) => {
         const success = !error;
         
         // Génération du flag dynamique
-        const codename = FLAG_CODENAMES[levelString] || 'GEEK';
-        const shortRand = Math.random().toString(36).substring(2, 6).toUpperCase();
-        const flag = success
-            ? `FLAG_LVL${levelString}_${codename}_${shortRand}`
-            : null;
+        let flag = null;
+        if (success) {
+            const options = FLAG_OPTIONS[levelString] || ['GG'];
+            flag = options[Math.floor(Math.random() * options.length)];
+        }
 
         res.json({ 
             success: success, 
