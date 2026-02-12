@@ -7,6 +7,19 @@ const path = require('path');
 
 const app = express();
 
+const FLAG_CODENAMES = {
+    '01': 'GG_PADAWAN',
+    '02': 'DELOREAN',
+    '03': 'CRITICAL',
+    '04': 'RPG_LOOT',
+    '05': 'ARC_REACTOR',
+    '06': 'H2G2_42',
+    '07': 'KONAMI',
+    '08': 'SABRE',
+    '09': 'HIGH_SCORE',
+    '10': 'ONE_RING',
+};
+
 // Middleware
 app.use(cors()); 
 app.use(bodyParser.json());
@@ -52,7 +65,11 @@ app.post('/run', (req, res) => {
         const success = !error;
         
         // Génération du flag dynamique
-        const flag = success ? `FLAG_LVL${levelString}_${Math.random().toString(36).substring(7).toUpperCase()}` : null;
+        const codename = FLAG_CODENAMES[levelString] || 'GEEK';
+        const shortRand = Math.random().toString(36).substring(2, 6).toUpperCase();
+        const flag = success
+            ? `FLAG_LVL${levelString}_${codename}_${shortRand}`
+            : null;
 
         res.json({ 
             success: success, 
