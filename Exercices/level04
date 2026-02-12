@@ -1,0 +1,6 @@
+def compter_objets(inventaire):
+    # MISSION : Cette fonction doit retourner le nombre d'éléments dans la liste 'inventaire'
+    # Indice : En Python, une fonction commençant par len... est utile
+    
+    # Code manquant...
+    return
